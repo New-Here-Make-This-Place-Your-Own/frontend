@@ -34,6 +34,8 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -44,7 +46,13 @@
     "web": "expo start --web",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest --passWithNoTests",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "private": true
 }
