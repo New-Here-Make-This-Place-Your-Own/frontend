@@ -37,6 +37,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "597846ce-a075-4813-b9ba-5b3f73cb7c6b"
+      }
+    },
+    "owner": "alisonparielas-team"
   }
 }
