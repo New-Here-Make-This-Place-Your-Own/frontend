@@ -1,147 +1,74 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Location from 'expo-location';
+import { apiRequest } from '@/lib/api';
+import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
-import { supabase } from '../lib/supabase';
-
-type PlaceResult = {
-  name: string;
-  country: string;
-  latitude: number;
-  longitude: number;
-};
-
-type Props = {
-  onSelect: (place: PlaceResult) => void;
-};
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
-const DEBOUNCE_MS = 350;
-
-export function PlacePicker({ onSelect }: Props) {
+type PlaceResult = { name: string; country: string; latitude: number; longitude: number };
+export function PlacePicker({ onSelect }: { onSelect: (place: PlaceResult | null) => void }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const requestIdRef = useRef(0);
-
-  const search = useCallback(async (text: string) => {
-    if (text.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-
-    const thisRequestId = ++requestIdRef.current;
-    setLoading(true);
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/places/search?q=${encodeURIComponent(text)}`,
-        {
-          headers: { Authorization: `Bearer ${session?.access_token}` },
-        }
-      );
-      const data = await response.json();
-
-      // Ignore stale responses — a slower earlier request finishing after
-      // a faster later one would otherwise flash outdated results.
-      if (thisRequestId === requestIdRef.current) {
-        setResults(data.results ?? []);
-      }
-    } catch (error) {
-      console.error('Place search failed:', error);
-    } finally {
-      if (thisRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  const handleChangeText = (text: string) => {
-    setQuery(text);
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    debounceRef.current = setTimeout(() => search(text), DEBOUNCE_MS);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  const handleAutoDetect = async () => {
-    setDetecting(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revision = useRef(0);
+  function cancelPending() {
+    revision.current++;
+    if (debounce.current) clearTimeout(debounce.current);
+    setLoading(false); setResults([]);
+  }
+  useEffect(() => () => { revision.current++; if (debounce.current) clearTimeout(debounce.current); }, []);
+  function change(text: string) {
+    cancelPending();
+    setQuery(text); setSelected(false); setError(''); onSelect(null);
+    if (text.trim().length < 2) return;
+    const request = revision.current;
+    debounce.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const data = await apiRequest<{ results: PlaceResult[] }>(`/api/v1/places/search?q=${encodeURIComponent(text.trim())}`);
+        if (request !== revision.current) return;
+        setResults(data.results);
+        if (!data.results.length) setError('No places found. Try a nearby city or town.');
+      } catch (err) {
+        if (request === revision.current) setError(err instanceof Error ? err.message : 'Search failed. Please try again.');
+      } finally { if (request === revision.current) setLoading(false); }
+    }, 350);
+  }
+  async function detect() {
+    cancelPending();
+    const request = revision.current;
+    setDetecting(true); setError(''); setSelected(false); onSelect(null);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        // Fall back silently to manual search — don't block onboarding
-        // on a denied permission.
-        return;
-      }
-
+      if (status !== 'granted') throw new Error('Location access was denied. Search for your city below.');
       const position = await Location.getCurrentPositionAsync({});
-
-      // We don't reverse-geocode client-side — send raw coordinates and
-      // let the backend resolve the display name. Keeps geocoding logic
-      // in one place.
-      onSelect({
-        name: '', // signals to the caller: GPS-only, no name resolved yet
-        country: '',
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-    } catch (error) {
-      console.error('Location detection failed:', error);
-    } finally {
-      setDetecting(false);
-    }
-  };
-
-  return (
-    <View>
-      <TouchableOpacity onPress={handleAutoDetect} disabled={detecting}>
-        <Text>{detecting ? 'Detecting your location…' : '📍 Use my current location'}</Text>
-      </TouchableOpacity>
-
-      <TextInput
-        value={query}
-        onChangeText={handleChangeText}
-        placeholder="Or search for a city, town, or village"
-        autoCorrect={false}
-      />
-
-      {loading && <ActivityIndicator />}
-
-      <FlatList
-        data={results}
-        keyExtractor={(item, index) => `${item.name}-${item.country}-${index}`}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => {
-              setQuery(`${item.name}, ${item.country}`);
-              setResults([]);
-              onSelect(item);
-            }}
-          >
-            <Text>{item.name}, {item.country}</Text>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
-  );
+      if (request !== revision.current) return;
+      onSelect({ name: '', country: '', latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setQuery('Current location selected'); setSelected(true);
+    } catch (err) {
+      if (request === revision.current) setError(err instanceof Error ? err.message : 'Unable to find your location. Search below.');
+    } finally { setDetecting(false); }
+  }
+  return <View style={styles.container}>
+    <Text style={styles.label}>Where are you exploring?</Text>
+    <TouchableOpacity accessibilityRole="button" style={styles.option} onPress={detect} disabled={detecting}>
+      <Text style={styles.label}>{detecting ? 'Detecting your location…' : '📍 Use my current location'}</Text>
+    </TouchableOpacity>
+    <TextInput accessibilityLabel="Search city, town, or village" style={styles.input} value={query} onChangeText={change} placeholder="Search for a city, town, or village" autoCorrect={false} editable={!detecting} />
+    {loading ? <ActivityIndicator /> : null}
+    {results.map((item, index) => <TouchableOpacity accessibilityRole="button" style={styles.option} key={`${item.name}-${item.country}-${index}`} onPress={() => {
+      cancelPending(); setQuery(`${item.name}, ${item.country}`); setSelected(true); setError(''); onSelect(item);
+    }}><Text style={styles.label}>{item.name}, {item.country}</Text></TouchableOpacity>)}
+    {selected ? <Text accessibilityLiveRegion="polite" style={styles.label}>✓ Location selected</Text> : null}
+    {error ? <Text accessibilityRole="alert" style={styles.label}>{error}</Text> : null}
+  </View>;
 }
+const styles = StyleSheet.create({
+  container: { gap: spacing.sm },
+  label: { fontFamily: fonts.outfitRegular, color: colors.ink, fontSize: 14 },
+  input: { borderWidth: 2, borderColor: colors.ink, borderRadius: radii.md, padding: spacing.lg, backgroundColor: colors.white, color: colors.ink, fontSize: 14 },
+  option: { padding: spacing.md, borderRadius: radii.sm, backgroundColor: colors.overlayLight },
+});

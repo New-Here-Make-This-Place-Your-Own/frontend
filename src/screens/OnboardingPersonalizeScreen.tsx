@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormPage } from '../components/FormPage';
+import { useProfile } from '../providers/profile-provider';
+import { apiRequest } from '../lib/api';
+import { isValidBirthDate } from '../lib/validation';
 import { useRouter } from 'expo-router';
 
 import { Card } from '../components/Card';
@@ -8,7 +11,7 @@ import { Chip } from '../components/Chip';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PlacePicker } from '../components/PlacePicker'; // see PlacePicker.tsx from the earlier typeahead work
 import { colors, fonts, radii, spacing, borders } from '../theme/tokens';
-import { supabase } from '../lib/supabase';
+
 
 const INTEREST_OPTIONS = [
   { label: 'Architecture 🏰', slug: 'architecture', category: 'architecture' },
@@ -21,7 +24,7 @@ const INTEREST_OPTIONS = [
   { label: 'Markets 🛍️', slug: 'markets', category: 'culture' },
 ];
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
+
 
 type SelectedPlace = {
   name: string;
@@ -33,15 +36,12 @@ type SelectedPlace = {
 export function OnboardingPersonalizeScreen() {
   const router = useRouter();
 
-  // NOTE: this screen's Figma design only covers interests. Name, DOB, and
-  // place are required by the onboarding API but weren't in the mock —
-  // added here at the top, styled to match, rather than inventing a new
-  // screen outside the existing flow.
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState(''); // expects YYYY-MM-DD; swap for a real date picker when available
+  const { profile, reload } = useProfile();
+  const [firstName, setFirstName] = useState(profile?.first_name ?? '');
+  const [lastName, setLastName] = useState(profile?.last_name ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(profile?.date_of_birth ?? '');
   const [place, setPlace] = useState<SelectedPlace | null>(null);
-  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>(INTEREST_OPTIONS.filter(option => profile?.interests.includes(option.category)).map(option => option.slug));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ export function OnboardingPersonalizeScreen() {
   };
 
   const canSubmit =
-    firstName.trim() && lastName.trim() && dateOfBirth.trim() && place && !submitting;
+    Boolean(firstName.trim() && lastName.trim() && isValidBirthDate(dateOfBirth) && place && !submitting);
 
   const handleSubmit = async () => {
     if (!canSubmit || !place) return;
@@ -61,10 +61,6 @@ export function OnboardingPersonalizeScreen() {
     setError(null);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
       const isGpsOnly = !place.name; // PlacePicker signals GPS-only with an empty name
 
       // Multiple UI tags can map to the same backend category (e.g. Hidden
@@ -75,12 +71,8 @@ export function OnboardingPersonalizeScreen() {
         ),
       ];
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/onboarding`, {
+      await apiRequest('/api/v1/users/onboarding', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
         body: JSON.stringify({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -92,11 +84,7 @@ export function OnboardingPersonalizeScreen() {
         }),
       });
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.detail ?? 'Something went wrong finishing onboarding.');
-      }
-
+      await reload();
       router.replace('/(app)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -106,14 +94,15 @@ export function OnboardingPersonalizeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <FormPage>
       <View style={styles.body}>
-        <Text style={styles.eyebrow}>Preferences</Text>
+        <Text style={styles.eyebrow}>Step 3 of 3 · Preferences</Text>
+        <Text onPress={() => router.replace("/(onboarding)/how-it-works")} style={styles.eyebrow}>← Back</Text>
 
         <View style={styles.headlineBlock}>
           <Text style={styles.headline}>What makes you wander?</Text>
           <Text style={styles.subhead}>
-            Tell us a bit about you and where you're exploring, so we can curate your daily paths
+            Tell us a bit about you and where you&apos;re exploring, so we can curate your daily paths
             & quests.
           </Text>
         </View>
@@ -122,6 +111,8 @@ export function OnboardingPersonalizeScreen() {
           <View style={styles.nameRow}>
             <TextInput
               style={[styles.input, styles.nameInput]}
+              accessibilityLabel="First name"
+              autoComplete="given-name"
               placeholder="First name"
               placeholderTextColor={colors.inkMuted}
               value={firstName}
@@ -129,6 +120,8 @@ export function OnboardingPersonalizeScreen() {
             />
             <TextInput
               style={[styles.input, styles.nameInput]}
+              accessibilityLabel="Last name"
+              autoComplete="family-name"
               placeholder="Last name"
               placeholderTextColor={colors.inkMuted}
               value={lastName}
@@ -137,14 +130,18 @@ export function OnboardingPersonalizeScreen() {
           </View>
           <TextInput
             style={styles.input}
+            accessibilityLabel="Date of birth, YYYY-MM-DD"
+            maxLength={10}
             placeholder="Date of birth (YYYY-MM-DD)"
             placeholderTextColor={colors.inkMuted}
             value={dateOfBirth}
             onChangeText={setDateOfBirth}
           />
+          {dateOfBirth && !isValidBirthDate(dateOfBirth) ? <Text accessibilityRole="alert" style={styles.errorText}>Enter a real date in YYYY-MM-DD format that is not in the future.</Text> : null}
           <PlacePicker onSelect={setPlace} />
         </View>
 
+        <Text style={styles.subhead}>Choose your interests (optional)</Text>
         <View style={styles.tagsWrapper}>
           {INTEREST_OPTIONS.map((option) => (
             <Chip
@@ -159,8 +156,8 @@ export function OnboardingPersonalizeScreen() {
         <Card gradient={colors.gradientPeriwinkle} padding={16}>
           <Text style={styles.tipTitle}>💡 Explorer Tip</Text>
           <Text style={styles.tipBody}>
-            "You can always change your settings later. Exploring is about surprising your
-            senses!"
+            You can always change your settings later. Exploring is about surprising your
+            senses!
           </Text>
         </Card>
 
@@ -175,13 +172,13 @@ export function OnboardingPersonalizeScreen() {
           loading={submitting}
         />
       </View>
-    </SafeAreaView>
+    </FormPage>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between' },
-  body: { padding: spacing.xxl, gap: spacing.xxl },
+  body: { gap: spacing.xxl },
   eyebrow: { fontFamily: fonts.outfitExtraBold, fontSize: 13, color: colors.inkMuted, textTransform: 'uppercase' },
   headlineBlock: { gap: spacing.sm },
   headline: { fontFamily: fonts.outfitExtraBold, fontSize: 28, color: colors.ink },
@@ -204,5 +201,5 @@ const styles = StyleSheet.create({
   tipTitle: { fontFamily: fonts.outfitExtraBold, fontSize: 14, color: colors.ink, marginBottom: spacing.xs },
   tipBody: { fontFamily: fonts.loraItalic, fontSize: 13, color: colors.inkMuted },
   errorText: { fontFamily: fonts.outfitRegular, fontSize: 13, color: '#c0392b' },
-  footer: { padding: spacing.xxl },
+  footer: { paddingVertical: spacing.lg },
 });

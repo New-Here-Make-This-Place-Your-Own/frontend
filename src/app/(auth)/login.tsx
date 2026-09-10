@@ -1,66 +1,27 @@
 import { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import { LoginScreen } from '@/screens/LoginScreen';
+import { isValidEmail, normalizeEmail } from '@/lib/validation';
 
-import { supabase } from '../../lib/supabase';
-
-export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function Login() {
   const [loading, setLoading] = useState(false);
-  async function handleLogin() {
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Unable to sign in', error.message);
+  const [error, setError] = useState('');
+  async function handleLogin(email: string, password: string) {
+    if (loading) return;
+    setError('');
+    if (!isValidEmail(email) || !password) {
+      setError('Enter a valid email address and your password.');
       return;
     }
-
-    router.replace('/');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password });
+      if (error) throw error;
+      router.replace('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.');
+    } finally { setLoading(false); }
   }
-
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-      <Text>New Here</Text>
-      <Text>Discover Your City</Text>
-
-      <TextInput
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <TextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <Button
-        title={loading ? 'Signing in...' : 'Sign in'}
-        onPress={handleLogin}
-        disabled={loading}
-      />
-
-      <Link href="/(auth)/signup">
-        Create an account
-      </Link>
-    </View>
-  );
+  return <LoginScreen loading={loading} error={error} onSubmit={handleLogin} />;
 }

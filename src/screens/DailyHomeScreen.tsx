@@ -1,6 +1,8 @@
+import { FormPage } from '../components/FormPage';
+import { useProfile } from '../providers/profile-provider';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { TreePalm, Sun, Lock, Clock, RefreshCw, Sparkles } from 'lucide-react-native';
 
 import { Card } from '../components/Card';
@@ -34,6 +36,7 @@ function timeUntil(expiresAt: string): string {
 }
 
 export function DailyHomeScreen() {
+  const { profile } = useProfile();
   const [quests, setQuests] = useState<Quest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +45,7 @@ export function DailyHomeScreen() {
   }, []);
 
   async function fetchQuests() {
+    setError(null);
     try {
       const {
         data: { session },
@@ -61,16 +65,16 @@ export function DailyHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <FormPage>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hey Wanderer! 👋</Text>
+          <Text style={styles.greeting}>Hey {profile?.first_name || 'Wanderer'}! 👋</Text>
           <View style={styles.brandRow}>
             <Text style={styles.brand}>New Here</Text>
             <Text style={styles.dot}>·</Text>
             <View style={styles.locationBadge}>
               <Sparkles size={14} color={colors.ink} />
-              <Text style={styles.locationText}>Port Louis</Text>
+              <Text style={styles.locationText}>Your neighborhood</Text>
             </View>
           </View>
         </View>
@@ -80,10 +84,10 @@ export function DailyHomeScreen() {
       </View>
 
       <View style={styles.philosophy}>
-        <Text style={styles.philosophyLabel}>Today's Philosophy</Text>
+        <Text style={styles.philosophyLabel}>Today&apos;s Philosophy</Text>
         <Text style={styles.philosophyQuote}>
-          "The real voyage of discovery consists not in seeking new landscapes, but in having new
-          eyes."
+          The real voyage of discovery consists not in seeking new landscapes, but in having new
+          eyes.
         </Text>
       </View>
 
@@ -104,10 +108,10 @@ export function DailyHomeScreen() {
       )}
 
       <View style={styles.prompts}>
-        <Text style={styles.sectionTitle}>Explore Today's Quests</Text>
+        <Text style={styles.sectionTitle}>Explore Today&apos;s Quests</Text>
 
         {!quests && !error && <ActivityIndicator style={styles.loader} />}
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error && <TouchableOpacity onPress={fetchQuests}><Text style={styles.errorText}>{error} Tap to retry.</Text></TouchableOpacity>}
 
         {quests?.map((quest, index) => {
           const style = CARD_STYLE_BY_SLOT[index];
@@ -154,7 +158,7 @@ export function DailyHomeScreen() {
           </TouchableOpacity>
         </Card>
       </View>
-    </SafeAreaView>
+    </FormPage>
   );
 }
 

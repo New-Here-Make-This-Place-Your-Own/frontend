@@ -1,76 +1,29 @@
 import { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
+import { SignupScreen } from '@/screens/SignupScreen';
+import { supabase } from '@/lib/supabase';
+import { getAuthRedirectUrl } from '@/lib/auth-links';
+import { isValidEmail, normalizeEmail } from '@/lib/validation';
 
-import { supabase } from '../../lib/supabase';
-
-export default function SignupScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function Signup() {
   const [loading, setLoading] = useState(false);
-
-  async function handleSignup() {
+  const [error, setError] = useState('');
+  async function handleSignup(email: string, password: string) {
+    if (loading) return;
+    setError('');
+    if (!isValidEmail(email)) { setError('Enter a valid email address.'); return; }
+    if (password.length < 8) { setError('Use a password with at least 8 characters.'); return; }
     setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Unable to create account', error.message);
-      return;
-    }
-
-    if (!data.session) {
-      Alert.alert(
-        'Check your email',
-        'Confirm your email before signing in.'
-      );
-
-      router.replace('/(auth)/login');
-      return;
-    }
-
-    router.replace('/');
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizeEmail(email), password,
+        options: { emailRedirectTo: getAuthRedirectUrl() },
+      });
+      if (error) throw error;
+      router.replace(data.session ? '/' : { pathname: '/(auth)/verify-email', params: { email: normalizeEmail(email) } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create your account. Please try again.');
+    } finally { setLoading(false); }
   }
-
-  return (
-    <View>
-      <Text>Create your New Here account</Text>
-
-      <TextInput
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <TextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <Button
-        title={loading ? 'Creating...' : 'Create account'}
-        onPress={handleSignup}
-        disabled={loading}
-      />
-
-      <Link href="/(auth)/login">
-        Already have an account?
-      </Link>
-    </View>
-  );
+  return <SignupScreen loading={loading} error={error} onSubmit={handleSignup} />;
 }

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormPage } from '../components/FormPage';
 import { useRouter } from 'expo-router';
 
 import { Card } from '../components/Card';
@@ -31,10 +31,10 @@ export function OnboardingHowItWorksScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <FormPage>
       <View style={styles.body}>
         <View style={styles.headerRow}>
-          <Text style={styles.eyebrow}>How it works</Text>
+          <Text style={styles.eyebrow}>Step 2 of 3 · How it works</Text>
           <TouchableOpacity
             style={styles.skipBadge}
             onPress={() => router.push('/(onboarding)/personalize')}
@@ -43,6 +43,7 @@ export function OnboardingHowItWorksScreen() {
           </TouchableOpacity>
         </View>
 
+        <Text style={styles.eyebrow} onPress={() => router.replace("/(onboarding)/welcome")}>← Back</Text>
         <Text style={styles.headline}>Your Daily Adventure Loop</Text>
 
         <View style={styles.steps}>
@@ -68,13 +69,13 @@ export function OnboardingHowItWorksScreen() {
           onPress={() => router.push('/(onboarding)/personalize')}
         />
       </View>
-    </SafeAreaView>
+    </FormPage>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between' },
-  body: { padding: spacing.xxl, gap: spacing.xxl },
+  body: { gap: spacing.xxl },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: { fontFamily: fonts.outfitExtraBold, fontSize: 13, color: colors.inkMuted, textTransform: 'uppercase' },
   skipBadge: {
@@ -103,5 +104,5 @@ const styles = StyleSheet.create({
   stepText: { flex: 1, gap: spacing.xs },
   stepTitle: { fontFamily: fonts.outfitExtraBold, fontSize: 16, color: colors.ink },
   stepBody: { fontFamily: fonts.loraRegular, fontSize: 13, lineHeight: 18, color: colors.inkMuted },
-  footer: { padding: spacing.xxl },
+  footer: { paddingVertical: spacing.lg },
 });

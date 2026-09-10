@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormPage } from '../components/FormPage';
 import { useRouter } from 'expo-router';
 import { Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ export function OnboardingWelcomeScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <FormPage>
       <View style={styles.body}>
         <View style={styles.brandBar}>
           <LinearGradient
@@ -22,23 +22,21 @@ export function OnboardingWelcomeScreen() {
           >
             <Sparkles size={16} color={colors.ink} />
           </LinearGradient>
-          <Text style={styles.brandLabel}>Hey Wanderer</Text>
+          <Text style={styles.brandLabel}>New Here</Text>
         </View>
 
-        {/* Content photo — replace with a real illustration/photo asset.
-            Placeholder block stands in for the Figma polaroid mock. */}
         <View style={styles.polaroid}>
-          <View style={styles.polaroidPhoto} />
+          <LinearGradient colors={colors.gradientMint} style={styles.polaroidPhoto}><Text style={{ fontSize: 88 }}>🏘️</Text><Text style={styles.polaroidCaption}>A little curiosity. A new discovery.</Text></LinearGradient>
           <View style={styles.polaroidCaptionRow}>
-            <Text style={styles.polaroidCaption}>"The adventure at your doorstep..."</Text>
-            <Text style={styles.polaroidChapter}>Chapter 1</Text>
+            <Text style={styles.polaroidCaption}>The adventure at your doorstep...</Text>
+            <Text style={styles.polaroidChapter}>Step 1 of 3</Text>
           </View>
         </View>
 
         <View style={styles.tagline}>
           <Text style={styles.headline}>Your city has secrets. We help you find them.</Text>
           <Text style={styles.subhead}>
-            Hey Wanderer is a whimsical daily companion that turns normal neighborhood strolls
+            New Here is a whimsical daily companion that turns normal neighborhood strolls
             into playful curatorial quests. Let us give you new eyes.
           </Text>
         </View>
@@ -47,13 +45,13 @@ export function OnboardingWelcomeScreen() {
       <View style={styles.footer}>
         <PrimaryButton label="Let's Begin 👋" onPress={() => router.push('/(onboarding)/how-it-works')} />
       </View>
-    </SafeAreaView>
+    </FormPage>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between' },
-  body: { padding: spacing.xxl, gap: spacing.xxl },
+  body: { gap: spacing.xxl },
   brandBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconBadge: {
     padding: spacing.sm,
@@ -73,7 +71,10 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-2deg' }],
   },
   polaroidPhoto: {
-    height: 260,
+    minHeight: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
     borderRadius: 8,
     backgroundColor: colors.overlayLight,
   },
@@ -83,5 +84,5 @@ const styles = StyleSheet.create({
   tagline: { gap: spacing.md },
   headline: { fontFamily: fonts.outfitExtraBold, fontSize: 32, lineHeight: 37, color: colors.ink },
   subhead: { fontFamily: fonts.loraRegular, fontSize: 16, lineHeight: 24, color: colors.inkMuted },
-  footer: { padding: spacing.xxl },
+  footer: { paddingVertical: spacing.lg },
 });

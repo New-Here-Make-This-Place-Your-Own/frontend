@@ -1,30 +1,25 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormPage } from '../components/FormPage';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { borders, colors, fonts, radii, spacing } from '../theme/tokens';
+import { router } from 'expo-router';
 
-/**
- * IMPORTANT: this is a styling reference only. You already have working
- * Supabase email/password auth wired up (auth-provider.tsx, the SecureStore
- * adapter, etc. from earlier in this build) — don't replace that logic.
- * Pull the JSX/styles below into your existing login screen rather than
- * swapping out the auth implementation.
- */
-export function LoginSignupScreen({
-  onSubmit,
+
+export function LoginScreen({
+  onSubmit, loading, error
 }: {
-  onSubmit: (email: string, password: string) => void;
+ error?: string; loading: boolean; onSubmit: (email: string, password: string) => void;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <FormPage>
       <View style={styles.body}>
         <View style={styles.header}>
-          <Text style={styles.headline}>Welcome back, Wanderer! 🔑</Text>
+          <Text style={styles.headline}>Welcome back! 🔑</Text>
           <Text style={styles.subhead}>
             Sign in to resume dropping pins and exploring city secrets.
           </Text>
@@ -32,12 +27,15 @@ export function LoginSignupScreen({
 
         <View style={styles.fields}>
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Wanderer Email</Text>
+            <Text style={styles.fieldLabel}>Email</Text>
             <TextInput
               style={styles.input}
               placeholder="wanderer@secretplaces.com"
               placeholderTextColor={colors.inkMuted}
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              accessibilityLabel="Email"
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
@@ -46,7 +44,7 @@ export function LoginSignupScreen({
           <View style={styles.fieldGroup}>
             <View style={styles.passwordLabelRow}>
               <Text style={styles.fieldLabel}>Secret Password</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
                 <Text style={styles.forgotLabel}>Forgot?</Text>
               </TouchableOpacity>
             </View>
@@ -54,6 +52,8 @@ export function LoginSignupScreen({
               style={styles.input}
               placeholder="••••••••••••"
               placeholderTextColor={colors.inkMuted}
+              accessibilityLabel="Password"
+              autoComplete="current-password"
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -61,30 +61,19 @@ export function LoginSignupScreen({
           </View>
         </View>
 
-        <PrimaryButton label="Sign In to Explore" onPress={() => onSubmit(email, password)} />
+        {error ? <Text accessibilityRole="alert" style={styles.subhead}>{error}</Text> : null}
+        <Text style={styles.toggleLink} onPress={() => router.push("/(auth)/verify-email")}>Resend confirmation email</Text>
+        <PrimaryButton disabled={loading} label={loading? "Signing In...": "Sign In to Explore"} onPress={() => onSubmit(email, password)} />
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerLabel}>or continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
 
-        <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialButton}>
-            <Text style={styles.socialLabel}>🌐  Google</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
-            <Text style={styles.socialLabel}>🍏  Apple</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.toggleText}>
-          New to wandering? <Text style={styles.toggleLink}>Create Account</Text>
+          New to wandering? <Text style={styles.toggleLink} onPress={() => router.replace("/(auth)/signup")}>Create Account</Text>
         </Text>
       </View>
-    </SafeAreaView>
+    </FormPage>
   );
 }
 
