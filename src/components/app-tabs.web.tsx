@@ -27,6 +27,8 @@ export default function AppTabs() {
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Past Quests</TabButton>
           </TabTrigger>
+          <TabTrigger name="library" href="/library" asChild><TabButton>Library</TabButton></TabTrigger>
+          <TabTrigger name="map" href="/map" asChild><TabButton>Map</TabButton></TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>

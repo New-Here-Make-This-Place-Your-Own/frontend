@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Image, Modal, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { Image, Modal, ScrollView, StyleSheet, Text, TextInput, Switch } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { uploadQuestPhoto } from '@/lib/photos';
@@ -10,6 +10,7 @@ import { colors, spacing } from '@/theme/tokens';
 export function CompleteQuestModal({ target, onClose, onCompleted }: { target: CompletionTarget; onClose: () => void; onCompleted: () => void }) {
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [caption, setCaption] = useState('');
+  const [isGhost, setIsGhost] = useState(false);
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export function CompleteQuestModal({ target, onClose, onCompleted }: { target: C
         if (!photo.base64) throw new Error('Unable to read this photo. Please select another.');
         uploadedPath.current = await uploadQuestPhoto(photo.base64, target);
       }
-      await completeQuest(target.kind, target.id, { photo_path: uploadedPath.current, caption: caption.trim() || undefined, ...pin });
+      await completeQuest(target.kind, target.id, { is_ghost: isGhost, photo_path: uploadedPath.current, caption: caption.trim() || undefined, ...pin });
       onCompleted();
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to save your memory. Please retry.'); }
     finally { submitting.current = false; setBusy(false); }
@@ -54,8 +55,11 @@ export function CompleteQuestModal({ target, onClose, onCompleted }: { target: C
       <PrimaryButton label={pin ? 'Update location pin' : 'Use my current location'} onPress={locate} disabled={busy} />
       {pin && <Text>Pin: {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}</Text>}
       <TextInput accessibilityLabel="Caption" placeholder="Add a caption (optional)" value={caption} onChangeText={setCaption} editable={!busy} multiline style={styles.input} />
+      <Text>Share as an anonymous ghost note</Text>
+      <Switch accessibilityLabel="Share as an anonymous ghost note" value={isGhost} onValueChange={setIsGhost} disabled={busy} />
+      <Text>{isGhost ? 'Your caption and pin will appear anonymously on the map. Your photo stays in your library.' : 'Only you can see this memory in your library.'}</Text>
       {error ? <Text accessibilityRole="alert">{error}</Text> : null}
-      <PrimaryButton label="Save memory" onPress={submit} loading={busy} disabled={!photo || !pin || busy} />
+      <PrimaryButton label={isGhost ? "Save and share ghost note" : "Save private memory"} onPress={submit} loading={busy} disabled={!photo || !pin || busy} />
       <PrimaryButton label="Cancel" onPress={onClose} disabled={busy} />
     </ScrollView>
   </Modal>;
