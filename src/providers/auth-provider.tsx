@@ -2,6 +2,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useState } fro
 import { Session } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { validateSession } from '../lib/session';
 
 type AuthContextValue = { session: Session | null; loading: boolean };
 const AuthContext = createContext<AuthContextValue>({ session: null, loading: true });
@@ -11,16 +12,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let mounted = true;
-    let authChanged = false;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      authChanged = true;
-      if (mounted) { setSession(session); setLoading(false); }
+    let revision = 0;
+    const validate = async (candidate: Session | null, request: number) => {
+      try {
+        const verified = await validateSession(candidate);
+        if (mounted && revision === request) setSession(verified);
+      } catch {
+        // A failed validation never grants access to onboarding.
+        if (mounted && revision === request) setSession(null);
+      } finally {
+        if (mounted && revision === request) setLoading(false);
+      }
+    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, candidate) => {
+      const request = ++revision;
+      if (!mounted) return;
+      setLoading(Boolean(candidate));
+      if (!candidate) { setSession(null); return; }
+      // Leave the Supabase auth callback before making another auth request.
+      setTimeout(() => { if (mounted && revision === request) void validate(candidate, request); }, 0);
     });
+    const initialRevision = revision;
     void supabase.auth.getSession().then(({ data }) => {
-      if (mounted && !authChanged) setSession(data.session);
+      if (mounted && revision === initialRevision) void validate(data.session, initialRevision);
     }).catch(() => {
-      if (mounted && !authChanged) setSession(null);
-    }).finally(() => { if (mounted) setLoading(false); });
+      if (mounted && revision === initialRevision) { setSession(null); setLoading(false); }
+    });
     const refresh = (state: string) => {
       if (state === 'active') supabase.auth.startAutoRefresh();
       else supabase.auth.stopAutoRefresh();

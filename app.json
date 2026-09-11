@@ -40,6 +40,14 @@
         {
           "locationWhenInUsePermission": "New Here uses your location to find nearby places and personalize your walks."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "New Here uses your selected photo to save quest memories.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

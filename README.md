@@ -39,16 +39,16 @@ References: [Supabase mobile deep links](https://supabase.com/docs/guides/auth/n
 ## Onboarding
 
 Authenticated users go through welcome → how it works → personalization → daily home.
-On app entry, the client reads its own `user_preferences` record using the existing Supabase RLS
+On app entry, the client reads its own `user_profiles` record using the existing Supabase RLS
 policy. A profile with first/last name, birth date, and city ID skips onboarding across restarts/devices.
 A profile read failure shows retry/sign-out controls instead of silently restarting setup.
 
 Personalization posts to `POST /api/v1/users/onboarding` using the actual backend schema:
 `first_name`, `last_name`, `date_of_birth` (YYYY-MM-DD), `latitude`, `longitude`, optional
-`place_name`/`place_country`, and deduplicated backend interest categories. Interests are optional.
+`place_name`/`place_country`, the device IANA `timezone`, and deduplicated backend interest categories. Interests are optional.
 The form validates real dates and required fields; searching after selecting a location clears that
 selection. Denied GPS permissions leave manual place search available. The UI navigates only after
-successful submission and reloads the persisted profile. Backend migrations 001–004 provide this flow.
+successful submission and reloads the persisted profile. Apply backend migrations 001–007 before using this frontend.
 
 ## Verification
 
@@ -64,3 +64,30 @@ On a fresh checkout, Expo generates typed routes on `npm start`; generated `.exp
 For a device smoke test: sign up, open the newest email on the phone, confirm return to onboarding,
 complete personalization, restart and confirm arrival at daily home. Test expired links, resend, and
 password recovery as well. Live delivery and database writes require the configured Supabase/backend.
+
+## Quest API integration
+
+`EXPO_PUBLIC_API_BASE_URL` is the backend origin only (no `/api/v1` suffix).
+Use `http://localhost:8000` for web, `http://10.0.2.2:8000` for an Android emulator,
+or your computer's LAN IP for a physical device. Run the backend with
+`uvicorn app.main:app --host 0.0.0.0 --port 8000`. The backend needs a configured `.env`;
+this frontend does not contain database credentials or provider keys.
+
+Daily requests use the shared authenticated API client and never send `local_date`.
+The home screen shows the server's expiry time, both daily assignments, city discovery
+status, and the actual curator riddle/cooldown. Refresh and returning to the screen reload
+data. The Past Quests tab paginates history and allows completion of unfinished entries.
+
+Completion opens a photo picker, obtains a foreground location pin, uploads JPEG bytes
+to the private Supabase `quest-photos` bucket, and posts `photo_path`, `caption`, `latitude`,
+and `longitude` to the matching daily/curator endpoint using the assignment ID. The
+backend verifies curator distance. Failed completion requests retain the uploaded path
+for retry while the form remains open. Abandoned uploads may need periodic cleanup.
+Migration 007 provisions the bucket and owner-only policies; it must be applied to the
+same Supabase project used for authentication. Rebuild native development apps after
+installing the new image-picker native module.
+
+For web, configure backend `CORS_ORIGINS` as a JSON array of frontend origins (defaults:
+`http://localhost:8081`, `http://127.0.0.1:8081`). Add your deployed web origin explicitly.
+
+Photo selection follows the [Expo 57 ImagePicker contract](https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/).

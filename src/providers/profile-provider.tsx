@@ -7,8 +7,8 @@ type ProfileState = { userId: string | null; profile: Profile | null; error: str
 async function readProfile(userId: string | null): Promise<ProfileState> {
   if (!userId) return { userId, profile: null, error: '' };
   try {
-    const { data, error } = await supabase.from('user_preferences')
-      .select('first_name,last_name,date_of_birth,city_id,interests').eq('user_id', userId).maybeSingle();
+    const { data, error } = await supabase.from('user_profiles')
+      .select('first_name,last_name,date_of_birth,city_id,interests,timezone').eq('user_id', userId).maybeSingle();
     if (error) throw error;
     return { userId, profile: data, error: '' };
   } catch {

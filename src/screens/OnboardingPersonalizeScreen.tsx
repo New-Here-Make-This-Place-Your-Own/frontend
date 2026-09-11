@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { FormPage } from '../components/FormPage';
 import { useProfile } from '../providers/profile-provider';
-import { apiRequest } from '../lib/api';
+import { submitOnboarding, deviceTimezone } from '../lib/backend';
 import { isValidBirthDate } from '../lib/validation';
 import { useRouter } from 'expo-router';
 
@@ -71,9 +71,7 @@ export function OnboardingPersonalizeScreen() {
         ),
       ];
 
-      await apiRequest('/api/v1/users/onboarding', {
-        method: 'POST',
-        body: JSON.stringify({
+      await submitOnboarding({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           date_of_birth: dateOfBirth.trim(),
@@ -81,7 +79,7 @@ export function OnboardingPersonalizeScreen() {
           longitude: place.longitude,
           ...(isGpsOnly ? {} : { place_name: place.name, place_country: place.country }),
           interests: categories,
-        }),
+          timezone: deviceTimezone(),
       });
 
       await reload();

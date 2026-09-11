@@ -1,24 +1,15 @@
 import { FormPage } from '../components/FormPage';
 import { useProfile } from '../providers/profile-provider';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { CompleteQuestModal } from '../components/CompleteQuestModal';
+import { City, CompletionTarget, CuratorResponse, DailyQuest, getCity, getCuratorQuest, getDailyQuests, retryCityDiscovery } from '../lib/backend';
+import { ActivityIndicator, AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { TreePalm, Sun, Lock, Clock, RefreshCw, Sparkles } from 'lucide-react-native';
+import { TreePalm, Sun, Clock, RefreshCw, Sparkles } from 'lucide-react-native';
 
 import { Card } from '../components/Card';
 import { borders, colors, fonts, radii, spacing } from '../theme/tokens';
-import { supabase } from '../lib/supabase';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
-
-type Quest = {
-  id: string;
-  prompt: string;
-  category: string;
-  status: string;
-  expires_at: string;
-};
-
 // Category -> icon/gradient, since the backend returns arbitrary category
 // strings but the design has two fixed visual treatments (mint "anchor",
 // coral "vibe"). Extend this as more categories get real card treatments.
@@ -27,8 +18,8 @@ const CARD_STYLE_BY_SLOT: Record<number, { gradient: readonly [string, string]; 
   1: { gradient: colors.gradientCoral, icon: Sun, badge: 'Sensory Vibe' },
 };
 
-function timeUntil(expiresAt: string): string {
-  const diffMs = new Date(expiresAt).getTime() - Date.now();
+function timeUntil(expiresAt: string, now: number): string {
+  const diffMs = new Date(expiresAt).getTime() - now;
   if (diffMs <= 0) return 'Expired';
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -37,35 +28,70 @@ function timeUntil(expiresAt: string): string {
 
 export function DailyHomeScreen() {
   const { profile } = useProfile();
-  const [quests, setQuests] = useState<Quest[] | null>(null);
+  const cityId = profile?.city_id;
+  const [quests, setQuests] = useState<DailyQuest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [curator, setCurator] = useState<CuratorResponse | null>(null);
+  const [curatorError, setCuratorError] = useState('');
+  const [retrying, setRetrying] = useState(false);
+  const [city, setCity] = useState<City | null>(null);
+  const [target, setTarget] = useState<CompletionTarget | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const revision = useRef(0);
+  const lastPoll = useRef(now);
+  const inFlight = useRef(false);
+  const focused = useRef(false);
 
-  useEffect(() => {
-    fetchQuests();
-  }, []);
+  const fetchQuests = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const request = revision.current;
+    setError(null); setCuratorError('');
+    await Promise.all([
+      getDailyQuests().then(data => { if (request === revision.current) setQuests(data.quests); })
+        .catch(err => { if (request === revision.current) setError(err instanceof Error ? err.message : 'Unable to load quests.'); }),
+      getCuratorQuest().then(data => { if (request === revision.current) setCurator(data); })
+        .catch(err => { if (request === revision.current) setCuratorError(err instanceof Error ? err.message : 'Unable to load curator quest.'); }),
+      cityId ? getCity(cityId).then(data => { if (request === revision.current) setCity(data); })
+        .catch(() => { if (request === revision.current) setCity(null); }) : Promise.resolve(),
+    ]);
+    if (request === revision.current) inFlight.current = false;
+  }, [cityId]);
 
-  async function fetchQuests() {
-    setError(null);
+  async function retryDiscovery() {
+    if (!cityId || retrying) return;
+    setRetrying(true); setCuratorError('');
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/quests/daily`, {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-
-      if (!response.ok) throw new Error('Failed to load today\'s quests.');
-
-      const data = await response.json();
-      setQuests(data.quests);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    }
+      const updated = await retryCityDiscovery(cityId);
+      revision.current++; inFlight.current = false;
+      setCity(updated);
+      await fetchQuests();
+    } catch (err) { setCuratorError(err instanceof Error ? err.message : 'Unable to retry discovery.'); }
+    finally { setRetrying(false); }
   }
+
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    void fetchQuests();
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') void fetchQuests(); });
+    return () => { focused.current = false; revision.current++; inFlight.current = false; subscription.remove(); };
+  }, [fetchQuests]));
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!focused.current || now <= lastPoll.current) return;
+    lastPoll.current = now;
+    const dailyExpired = quests?.some(q => new Date(q.expires_at).getTime() <= now);
+    const curatorExpired = curator?.quest && new Date(curator.quest.expires_at).getTime() <= now;
+    const cooldownEnded = curator?.next_available_at && new Date(curator.next_available_at).getTime() <= now;
+    if (dailyExpired || curatorExpired || cooldownEnded || curator?.reason === 'city_not_ready') void fetchQuests();
+  }, [now, quests, curator, fetchQuests]);
 
   return (
     <FormPage>
+      {target && <CompleteQuestModal key={target.id} target={target} onClose={() => setTarget(null)} onCompleted={() => { setTarget(null); revision.current++; inFlight.current = false; void fetchQuests(); }} />}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hey {profile?.first_name || 'Wanderer'}! 👋</Text>
@@ -74,7 +100,7 @@ export function DailyHomeScreen() {
             <Text style={styles.dot}>·</Text>
             <View style={styles.locationBadge}>
               <Sparkles size={14} color={colors.ink} />
-              <Text style={styles.locationText}>Your neighborhood</Text>
+              <Text style={styles.locationText}>{city?.name || 'Your neighborhood'}</Text>
             </View>
           </View>
         </View>
@@ -98,11 +124,11 @@ export function DailyHomeScreen() {
           </View>
           <View style={styles.timerText}>
             <Text style={styles.timerLabel}>Next prompts in</Text>
-            <Text style={styles.timerValue}>{timeUntil(quests[0].expires_at)}</Text>
+            <Text style={styles.timerValue}>{timeUntil(quests[0].expires_at, now)}</Text>
           </View>
           <TouchableOpacity style={styles.resetChip} onPress={fetchQuests}>
             <RefreshCw size={16} color={colors.ink} />
-            <Text style={styles.resetLabel}>Reset</Text>
+            <Text style={styles.resetLabel}>Refresh</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -113,6 +139,7 @@ export function DailyHomeScreen() {
         {!quests && !error && <ActivityIndicator style={styles.loader} />}
         {error && <TouchableOpacity onPress={fetchQuests}><Text style={styles.errorText}>{error} Tap to retry.</Text></TouchableOpacity>}
 
+        {quests?.length === 0 && <Text style={styles.cardSubtext}>You have explored every available daily quest. You can still finish quests in Past Quests.</Text>}
         {quests?.map((quest, index) => {
           const style = CARD_STYLE_BY_SLOT[index];
           if (!style) return null; // more than 2 quests isn't designed for yet
@@ -129,33 +156,34 @@ export function DailyHomeScreen() {
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{quest.prompt}</Text>
               </View>
-              {index === 0 && (
-                <TouchableOpacity style={styles.captureButton}>
+              {quest.status !== 'completed' ? (
+                <TouchableOpacity style={styles.captureButton} onPress={() => setTarget({ id: quest.id, kind: 'daily', prompt: quest.prompt })}>
                   <Text style={styles.captureLabel}>📍 Capture Moment & Drop Pin</Text>
                 </TouchableOpacity>
-              )}
+              ) : <Text style={styles.cardSubtext}>Completed ✓</Text>}
             </Card>
           );
         })}
 
-        {/* Curator quest — locked state; wire up to GET /quests/curator once
-            that endpoint exists (next backend slice). */}
         <Card>
-          <View style={styles.cardHeader}>
-            <View style={[styles.badge, styles.badgeDark]}>
-              <Text style={[styles.badgeLabel, styles.badgeLabelLight]}>Curator Pro</Text>
-            </View>
-            <View style={styles.lockIcon}>
-              <Lock size={18} color={colors.ink} />
-            </View>
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Pro Quest: A hidden architectural detail built before 1950...</Text>
-            <Text style={styles.cardSubtext}>Unlock to reveal the location and curator notes.</Text>
-          </View>
-          <TouchableOpacity style={styles.unlockButton}>
-            <Text style={styles.unlockLabel}>✨ Tap to Unlock Curator Quests</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Curator Quest</Text>
+          {city?.status === 'failed' && <TouchableOpacity style={styles.captureButton} onPress={retryDiscovery} disabled={retrying}>
+            <Text style={styles.captureLabel}>{retrying ? 'Starting discovery…' : 'Retry place discovery'}</Text>
+          </TouchableOpacity>}
+          {curatorError ? <TouchableOpacity onPress={fetchQuests}><Text style={styles.errorText}>{curatorError} Tap to retry.</Text></TouchableOpacity> : null}
+          {!curator && !curatorError && <ActivityIndicator />}
+          {curator?.quest ? <>
+            <Text style={styles.cardTitle}>{curator.quest.riddle}</Text>
+            <Text style={styles.cardSubtext}>Moves to Past Quests in {timeUntil(curator.quest.expires_at, now)}.</Text>
+            <TouchableOpacity style={styles.captureButton} onPress={() => setTarget({ id: curator.quest!.id, kind: 'curator', prompt: curator.quest!.riddle })}>
+              <Text style={styles.captureLabel}>📍 Capture Moment & Drop Pin</Text>
+            </TouchableOpacity>
+          </> : curator ? <Text style={styles.cardSubtext}>{
+            curator.reason === 'not_yet' ? `Your next curator quest is available ${curator.next_available_at ? new Date(curator.next_available_at).toLocaleString() : 'next week'}.` :
+            curator.reason === 'city_not_ready' ? (city?.status === 'failed' ? 'Place discovery failed. Tap below to try again.' : 'Discovering places in your city…') :
+            curator.reason === 'no_eligible_places' ? 'No new places with enough clues are available yet.' :
+            'Finish setting up your city to receive curator quests.'
+          }</Text> : null}
         </Card>
       </View>
     </FormPage>

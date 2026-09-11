@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { apiRequest } from '@/lib/api';
 import { colors, fonts, radii, spacing } from '@/theme/tokens';
 
-type PlaceResult = { name: string; country: string; latitude: number; longitude: number };
+type PlaceResult = { name: string; country: string; region?: string | null; latitude: number; longitude: number };
 export function PlacePicker({ onSelect }: { onSelect: (place: PlaceResult | null) => void }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -60,8 +60,8 @@ export function PlacePicker({ onSelect }: { onSelect: (place: PlaceResult | null
     <TextInput accessibilityLabel="Search city, town, or village" style={styles.input} value={query} onChangeText={change} placeholder="Search for a city, town, or village" autoCorrect={false} editable={!detecting} />
     {loading ? <ActivityIndicator /> : null}
     {results.map((item, index) => <TouchableOpacity accessibilityRole="button" style={styles.option} key={`${item.name}-${item.country}-${index}`} onPress={() => {
-      cancelPending(); setQuery(`${item.name}, ${item.country}`); setSelected(true); setError(''); onSelect(item);
-    }}><Text style={styles.label}>{item.name}, {item.country}</Text></TouchableOpacity>)}
+      cancelPending(); setQuery([item.name, item.region, item.country].filter(Boolean).join(", ")); setSelected(true); setError(''); onSelect(item);
+    }}><Text style={styles.label}>{[item.name, item.region, item.country].filter(Boolean).join(", ")}</Text></TouchableOpacity>)}
     {selected ? <Text accessibilityLiveRegion="polite" style={styles.label}>✓ Location selected</Text> : null}
     {error ? <Text accessibilityRole="alert" style={styles.label}>{error}</Text> : null}
   </View>;
