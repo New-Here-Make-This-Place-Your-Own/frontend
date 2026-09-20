@@ -12,7 +12,7 @@ export function ProfileGate({ children, onboarding = false }: PropsWithChildren<
   const { session, loading: authLoading } = useAuth();
   const { profile, loading, error, reload } = useProfile();
   if (authLoading) return <ActivityIndicator />;
-  if (!session) return <Redirect href="/(auth)/login" />;
+  if (!session) return <Redirect href="/(auth)/start" />;
   if (loading) return <ActivityIndicator />;
   if (error) return <FormPage>
     <Text accessibilityRole="alert">{error}</Text>

@@ -93,7 +93,7 @@ export function DailyHomeScreen() {
     <FormPage>
       {target && <CompleteQuestModal key={target.id} target={target} onClose={() => setTarget(null)} onCompleted={() => { setTarget(null); revision.current++; inFlight.current = false; void fetchQuests(); }} />}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={styles.greeting}>Hey {profile?.first_name || 'Wanderer'}! 👋</Text>
           <View style={styles.brandRow}>
             <Text style={styles.brand}>New Here</Text>
@@ -196,13 +196,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: spacing.xxl,
+    gap: spacing.md,
   },
+  headerCopy: { flex: 1, minWidth: 0 },
   greeting: { fontFamily: fonts.outfitExtraBold, fontSize: 28, color: colors.ink },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   brand: { fontFamily: fonts.outfitExtraBold, fontSize: 13, color: colors.ink },
   dot: { fontFamily: fonts.outfitBold, fontSize: 13, color: colors.inkMuted },
   locationBadge: {
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -211,22 +213,23 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     backgroundColor: colors.overlayLight,
   },
-  locationText: { fontFamily: fonts.outfitBold, fontSize: 13, color: colors.ink },
+  locationText: { flexShrink: 1, fontFamily: fonts.outfitBold, fontSize: 13, color: colors.ink },
   avatarRing: {
+    flexShrink: 0,
     borderWidth: borders.standard,
     borderColor: colors.ink,
     borderRadius: radii.pill,
     padding: 3,
   },
   avatar: { width: 44, height: 44, borderRadius: radii.pill, backgroundColor: colors.overlayLight },
-  philosophy: { paddingHorizontal: spacing.xxl, paddingBottom: spacing.xxl, gap: spacing.xs },
+  philosophy: { gap: spacing.xs },
   philosophyLabel: { fontFamily: fonts.outfitSemiBold, fontSize: 15, color: colors.inkMuted, textTransform: 'uppercase' },
   philosophyQuote: { fontFamily: fonts.loraItalic, fontSize: 18, lineHeight: 25, color: colors.ink },
   timer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.md,
-    marginHorizontal: spacing.xxl,
     padding: spacing.lg,
     borderRadius: radii.lg,
     backgroundColor: colors.overlayLight,
@@ -241,7 +244,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timerText: { flex: 1, gap: 2 },
+  timerText: { flexGrow: 1, flexBasis: 100, gap: 2 },
   timerLabel: { fontFamily: fonts.outfitBold, fontSize: 12, color: colors.inkMuted, textTransform: 'uppercase' },
   timerValue: { fontFamily: fonts.outfitExtraBold, fontSize: 16, color: colors.ink },
   resetChip: {
@@ -256,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   resetLabel: { fontFamily: fonts.outfitExtraBold, fontSize: 12, color: colors.ink },
-  prompts: { padding: spacing.xxl, gap: spacing.xl },
+  prompts: { gap: spacing.xl },
   sectionTitle: { fontFamily: fonts.outfitExtraBold, fontSize: 18, color: colors.ink },
   loader: { marginVertical: spacing.xxl },
   errorText: { fontFamily: fonts.outfitRegular, fontSize: 14, color: '#c0392b' },
@@ -277,6 +280,7 @@ const styles = StyleSheet.create({
   cardSubtext: { fontFamily: fonts.loraItalic, fontSize: 14, color: colors.inkMuted },
   captureButton: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     paddingHorizontal: 18,
     paddingVertical: spacing.md,
     borderRadius: radii.lg,

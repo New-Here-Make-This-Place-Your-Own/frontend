@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Text } from 'react-native';
+import { ActivityIndicator, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { completeAuthLink } from '@/lib/auth-links';
 import { FormPage } from '@/components/FormPage';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useAuth } from '@/providers/auth-provider';
+import { EntryHeading, EntryMessage } from '@/components/EntryUI';
+import { entry } from '@/theme/entry';
 
 export default function AuthCallback() {
   const url = Linking.useLinkingURL();
@@ -23,12 +25,12 @@ export default function AuthCallback() {
     });
     return () => { active = false; };
   }, [url, loading]);
-  return <FormPage>
-    <Text>{error ? 'Unable to open this email link' : 'Verifying your email link…'}</Text>
+  return <FormPage variant="entry" contentStyle={{ paddingTop: 56 }}>
+    <EntryHeading title={error ? 'Let’s try that again.' : 'Opening your next chapter…'} />
     {error ? <>
-      <Text accessibilityRole="alert">{error}</Text>
-      <PrimaryButton label="Back to sign in" onPress={() => router.replace('/(auth)/login')} />
-      <PrimaryButton label="Request another confirmation" onPress={() => router.replace('/(auth)/verify-email')} />
-    </> : <ActivityIndicator />}
+      <EntryMessage error>{error}</EntryMessage>
+      <PrimaryButton variant="entry" label="Back to sign in" onPress={() => router.replace('/(auth)/login')} />
+      <PrimaryButton variant="entry" label="Request another confirmation" onPress={() => router.replace('/(auth)/verify-email')} />
+    </> : <ActivityIndicator color={entry.colors.coral} />}
   </FormPage>;
 }

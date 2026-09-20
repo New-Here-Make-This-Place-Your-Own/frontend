@@ -5,9 +5,23 @@ jest.mock('../supabase', () => ({ supabase: { auth: { getSession: jest.fn(), get
 const originalFetch = globalThis.fetch;
 const originalBase = process.env.EXPO_PUBLIC_API_BASE_URL;
 beforeEach(() => {
+  jest.clearAllMocks();
   process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example/';
   globalThis.fetch = jest.fn<typeof fetch>();
   jest.mocked(supabase.auth.getSession).mockResolvedValue({ data: { session: { access_token: 'test-token', user: { id: 'user-id' } } }, error: null } as never);
+});
+
+test('shows a readable connection error without signing out', async () => {
+  jest.mocked(globalThis.fetch).mockRejectedValue(new TypeError('java.net.ConnectException: Failed to connect'));
+  await expect(apiRequest('/api/v1/quests/daily')).rejects.toThrow('Cannot connect to the server. Check your connection and try again.');
+  expect(supabase.auth.signOut).not.toHaveBeenCalled();
+});
+
+test('keeps timeout errors distinct from connection failures', async () => {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  jest.mocked(globalThis.fetch).mockRejectedValue(error);
+  await expect(apiRequest('/api/v1/quests/daily')).rejects.toThrow('The request timed out. Please try again.');
 });
 afterEach(() => { globalThis.fetch = originalFetch; if (originalBase === undefined) delete process.env.EXPO_PUBLIC_API_BASE_URL; else process.env.EXPO_PUBLIC_API_BASE_URL = originalBase; });
 test('sends an authenticated onboarding request to the backend', async () => {

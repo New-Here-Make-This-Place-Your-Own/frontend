@@ -11,6 +11,10 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, timeou
     const response = await fetch(`${base.replace(/\/$/, '')}${path}`, {
       ...init, signal: controller.signal,
       headers: { 'Content-Type': 'application/json', ...init.headers, Authorization: `Bearer ${session.access_token}` },
+    }).catch((err: unknown) => {
+      if (controller.signal.aborted) throw new Error('The request timed out. Please try again.');
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      throw new Error('Cannot connect to the server. Check your connection and try again.');
     });
     const body = await response.json().catch(() => null);
     if (response.status === 401) {

@@ -1,122 +1,55 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { FormPage } from '../components/FormPage';
-
-import { PrimaryButton } from '../components/PrimaryButton';
-import { borders, colors, fonts, radii, spacing } from '../theme/tokens';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { FormPage } from '@/components/FormPage';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { EntryField, EntryHeading, EntryIcon, EntryMessage, ui } from '@/components/EntryUI';
+import { entry } from '@/theme/entry';
+import { entryAssets } from '@/theme/entry-assets';
+import { SocialProvider } from '@/lib/social-auth';
 
-
-export function LoginScreen({
-  onSubmit, loading, error
-}: {
- error?: string; loading: boolean; onSubmit: (email: string, password: string) => void;
+export function LoginScreen({ onSubmit, onSocialSignIn, loading, socialProvider, error }: {
+  error?: string; loading: boolean; socialProvider?: SocialProvider | null;
+  onSubmit: (email: string, password: string) => void;
+  onSocialSignIn: (provider: SocialProvider) => void;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  return (
-    <FormPage>
-      <View style={styles.body}>
-        <View style={styles.header}>
-          <Text style={styles.headline}>Welcome back! 🔑</Text>
-          <Text style={styles.subhead}>
-            Sign in to resume dropping pins and exploring city secrets.
-          </Text>
-        </View>
-
-        <View style={styles.fields}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="wanderer@secretplaces.com"
-              placeholderTextColor={colors.inkMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              accessibilityLabel="Email"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-          <View style={styles.fieldGroup}>
-            <View style={styles.passwordLabelRow}>
-              <Text style={styles.fieldLabel}>Secret Password</Text>
-              <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
-                <Text style={styles.forgotLabel}>Forgot?</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••••••"
-              placeholderTextColor={colors.inkMuted}
-              accessibilityLabel="Password"
-              autoComplete="current-password"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-        </View>
-
-        {error ? <Text accessibilityRole="alert" style={styles.subhead}>{error}</Text> : null}
-        <Text style={styles.toggleLink} onPress={() => router.push("/(auth)/verify-email")}>Resend confirmation email</Text>
-        <PrimaryButton disabled={loading} label={loading? "Signing In...": "Sign In to Explore"} onPress={() => onSubmit(email, password)} />
-
-
+  const busy = loading || Boolean(socialProvider);
+  return <FormPage variant="entry" contentStyle={styles.page}>
+    <EntryHeading title="Welcome back." subtitle="There’s more of your city waiting." />
+    <View style={styles.form}>
+      <EntryField label="Email" icon={entryAssets.login.imgMargin} placeholder="wanderer@cartography.org" autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" value={email} onChangeText={setEmail} editable={!busy} />
+      <EntryField label="Password" password icon={entryAssets.login.imgMargin1} placeholder="••••••••••" autoComplete="current-password" value={password} onChangeText={setPassword} editable={!busy} onSubmitEditing={() => onSubmit(email, password)} />
+      <View style={styles.utilities}>
+        <Pressable accessibilityRole="link" onPress={() => router.push('/(auth)/verify-email')} hitSlop={8}><Text style={styles.resend}>Resend confirmation</Text></Pressable>
+        <Pressable accessibilityRole="link" onPress={() => router.push('/(auth)/forgot-password')} hitSlop={8}><Text style={ui.link}>Forgot password?</Text></Pressable>
       </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.toggleText}>
-          New to wandering? <Text style={styles.toggleLink} onPress={() => router.replace("/(auth)/signup")}>Create Account</Text>
-        </Text>
-      </View>
-    </FormPage>
-  );
+      <EntryMessage error>{error}</EntryMessage>
+      <PrimaryButton variant="entryGradient" label="Continue journey" loading={loading} disabled={busy} onPress={() => onSubmit(email, password)} icon={<EntryIcon source={entryAssets.login.imgContainer1} size={12} />} />
+    </View>
+    <View style={styles.divider}><View style={styles.line} /><Text style={styles.dividerText}>or continue through</Text><View style={styles.line} /></View>
+    <View style={styles.socials}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityState={{ disabled: busy, busy: socialProvider === 'google' }} disabled={busy} onPress={() => onSocialSignIn('google')} style={({ pressed }) => [styles.social, (pressed || busy) && ui.pressed]}>
+        {socialProvider === 'google' ? <ActivityIndicator color={entry.colors.rust} size="small" /> : <EntryIcon source={entryAssets.login.imgSvg} size={16} />}
+        <Text style={styles.socialText}>Continue with Google</Text>
+      </Pressable>
+    </View>
+    <View style={styles.footer}><Text style={styles.footerText}>New to the expedition?</Text><Pressable accessibilityRole="link" onPress={() => router.replace('/(auth)/signup')} hitSlop={8}><Text style={styles.create}>Create an account</Text></Pressable></View>
+  </FormPage>;
 }
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between' },
-  body: { padding: spacing.xxl, gap: spacing.xl },
-  header: { gap: spacing.sm },
-  headline: { fontFamily: fonts.outfitExtraBold, fontSize: 28, color: colors.ink },
-  subhead: { fontFamily: fonts.loraItalic, fontSize: 15, color: colors.inkMuted },
-  fields: { gap: spacing.lg },
-  fieldGroup: { gap: spacing.sm },
-  fieldLabel: { fontFamily: fonts.outfitExtraBold, fontSize: 13, color: colors.ink, textTransform: 'uppercase' },
-  passwordLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  forgotLabel: { fontFamily: fonts.outfitBold, fontSize: 12, color: colors.inkMuted },
-  input: {
-    borderWidth: borders.standard,
-    borderColor: colors.ink,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
-    fontFamily: fonts.outfitRegular,
-    fontSize: 14,
-    color: colors.ink,
-    backgroundColor: colors.white,
-  },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.overlayLight },
-  dividerLabel: { fontFamily: fonts.outfitBold, fontSize: 12, color: colors.inkMuted },
-  socialRow: { flexDirection: 'row', gap: spacing.md },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderWidth: borders.standard,
-    borderColor: colors.ink,
-    borderRadius: radii.md,
-    backgroundColor: colors.white,
-  },
-  socialLabel: { fontFamily: fonts.outfitBold, fontSize: 13, color: colors.ink },
-  footer: { padding: spacing.xxl, alignItems: 'center' },
-  toggleText: { fontFamily: fonts.loraRegular, fontSize: 14, color: colors.inkMuted },
-  toggleLink: { fontFamily: fonts.outfitExtraBold, color: colors.ink, textDecorationLine: 'underline' },
+  page: { paddingTop: 56, gap: 0, minHeight: 844 },
+  form: { marginTop: 48, gap: 24 },
+  utilities: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
+  resend: { fontFamily: entry.fonts.sans, fontSize: 11, color: entry.colors.subtle, lineHeight: 20 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 40, marginBottom: 28 },
+  dividerText: { fontFamily: entry.fonts.italic, fontSize: 19, color: entry.colors.subtle },
+  line: { flex: 1, height: 1, backgroundColor: '#e5e2dc' },
+  socials: { gap: 12 },
+  social: { flexDirection: 'row', gap: 12, justifyContent: 'center', alignItems: 'center', minHeight: 48, backgroundColor: '#fff', borderColor: entry.colors.line, borderWidth: 1, borderRadius: 999 },
+  socialText: { fontFamily: entry.fonts.semibold, fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: entry.colors.ink },
+  footer: { marginTop: 48, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: entry.colors.faint, flexDirection: 'row', flexWrap: 'wrap', alignSelf: 'center', justifyContent: 'center', gap: 8 },
+  footerText: { fontFamily: entry.fonts.sans, fontSize: 12, color: entry.colors.muted },
+  create: { fontFamily: entry.fonts.semibold, fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase', color: entry.colors.rust },
 });

@@ -38,7 +38,9 @@ References: [Supabase mobile deep links](https://supabase.com/docs/guides/auth/n
 
 ## Onboarding
 
-Authenticated users go through welcome → how it works → personalization → daily home.
+Signed-out users see the Sunlit Horizon welcome screen. Authenticated users go through
+the introduction → location → personal details → interests → completion → daily home.
+Draft details and interest choices stay in memory when navigating back between setup steps.
 On app entry, the client reads its own `user_profiles` record using the existing Supabase RLS
 policy. A profile with first/last name, birth date, and city ID skips onboarding across restarts/devices.
 A profile read failure shows retry/sign-out controls instead of silently restarting setup.
@@ -49,6 +51,36 @@ Personalization posts to `POST /api/v1/users/onboarding` using the actual backen
 The form validates real dates and required fields; searching after selecting a location clears that
 selection. Denied GPS permissions leave manual place search available. The UI navigates only after
 successful submission and reloads the persisted profile. Apply backend migrations 001–007 before using this frontend.
+
+## V2 authentication and onboarding design
+
+These screens follow [New Here V2 in Figma](https://www.figma.com/design/5NwsUuFhTW521CFckC3ebQ/New-Here-V2-?node-id=0-1).
+Their scoped tokens live in `src/theme/entry.ts`; `FormPage` and `PrimaryButton` use an
+explicit entry variant. The remaining app screens keep their existing design.
+Exported Figma assets and the Newsreader / Plus Jakarta Sans fonts are bundled locally,
+including the font licenses, so no expiring Figma URLs are required at runtime.
+
+Personal details remain required by the existing API, so there is no misleading Skip action.
+The six interest tiles show the actual selection count and map to the existing API categories.
+Completion uses the returned city name/status rather than claiming quests have already been
+generated. The Figma Port Louis map illustration is used only for that area; other locations
+use the atmospheric location illustration with the returned city name.
+
+## Google sign-in
+
+The login screen supports Google through Supabase OAuth. Web uses a same-tab
+redirect; native uses the system browser authentication session and the existing callback
+exchange. Cancellation returns to the login screen. These buttons require the providers to
+be enabled and configured in the connected Supabase project:
+
+- Google: configure the OAuth web client ID/secret and allow the Supabase callback URL in
+  Google Cloud. See [Supabase Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google).
+- Add this app’s web origin callback and `newhere://auth/callback` to Supabase’s redirect
+  allow list. Use a development or installed native build for OAuth; Expo Go cannot provide
+  a stable custom app scheme for production social authentication.
+
+Provider secrets belong in the provider/Supabase dashboards, never in `EXPO_PUBLIC_*`.
+Provider credentials and redirects must be verified with real accounts before release.
 
 ## Verification
 
